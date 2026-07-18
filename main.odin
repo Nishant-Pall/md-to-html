@@ -9,7 +9,8 @@ main :: proc() {
 	read_markdown()
 }
 
-Md_Char :: enum u8 {
+HEADER_TAG_CAP :: 6
+MD_Processor :: enum u8 {
 	Hash = '#',
 }
 
@@ -45,6 +46,7 @@ read_from_reader :: proc(parser: ^Parser) {
 		line, err := bufio.reader_read_byte(parser.reader)
 		if err != nil {
 			if err == .EOF {
+				fmt.printf("EOF reached: %v", err)
 				break
 			}
 			fmt.printf("Error reading from stream: %v", err)
@@ -56,7 +58,7 @@ read_from_reader :: proc(parser: ^Parser) {
 }
 
 read_byte :: proc(char: u8, parser: ^Parser) {
-	switch Md_Char(char) {
+	switch MD_Processor(char) {
 	case .Hash:
 		handle_pound(char, parser)
 	case:
@@ -65,10 +67,10 @@ read_byte :: proc(char: u8, parser: ^Parser) {
 }
 
 handle_pound :: proc(char: u8, parser: ^Parser) {
-	number_of_pounds := count_pounds(parser)
-
-	skip_lines(parser, number_of_pounds)
-
+	number_of_pounds, ok := count_pounds(parser)
+	if !ok {
+		return
+	}
 
 	line, err := bufio.reader_read_bytes(parser.reader, '\n')
 
@@ -76,6 +78,15 @@ handle_pound :: proc(char: u8, parser: ^Parser) {
 		fmt.printf("Error reading line: %v", err)
 		return
 	}
+
+	if number_of_pounds > HEADER_TAG_CAP {
+		for _ in 0 ..< number_of_pounds {
+			fmt.sbprintf(&parser.out, "#")
+		}
+		strings.write_string(&parser.out, string(line[:len(line) - 1]))
+		return
+	}
+
 
 	fmt.sbprintf(&parser.out, "<h%d>", number_of_pounds)
 	strings.write_string(&parser.out, string(line[:len(line) - 1]))
@@ -86,26 +97,13 @@ handle_pound :: proc(char: u8, parser: ^Parser) {
 	return
 }
 
-count_pounds :: proc(parser: ^Parser) -> int {
-	number_of_pounds := 1
-	for {
-		peek, err := bufio.reader_peek(parser.reader, 1)
-		if err != nil {
-			fmt.printf("error: %v \r\n", err)
-			break
-		}
-
-		// still a # so continue
-		if Md_Char(peek[0]) == .Hash {
-			number_of_pounds += 1
-			continue
-		}
-
-		if peek[0] == ' ' {
-			break
-		}
+count_pounds :: proc(parser: ^Parser) -> (int, bool) {
+	slice_until_delim, err := bufio.reader_read_slice(parser.reader, ' ')
+	if err != nil {
+		fmt.printf("error: %v \r\n", err)
+		return 0, false
 	}
-	return number_of_pounds
+	return len(slice_until_delim), true
 }
 
 skip_lines :: proc(parser: ^Parser, n_to_skip: int) {
