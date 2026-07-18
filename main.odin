@@ -9,11 +9,6 @@ main :: proc() {
 	read_markdown()
 }
 
-HEADER_TAG_CAP :: 6
-MD_Processor :: enum u8 {
-	Hash = '#',
-}
-
 read_markdown :: proc() {
 	md_file_path := os.args[1]
 	file, err := os.open(md_file_path)
@@ -61,6 +56,8 @@ read_byte :: proc(char: u8, parser: ^Parser) {
 	switch MD_Processor(char) {
 	case .Hash:
 		handle_pound(char, parser)
+	case .Newline:
+		strings.write_string(&parser.out, "\n")
 	case:
 		return
 	}
