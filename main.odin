@@ -25,9 +25,9 @@ read_markdown :: proc() {
 
 	sb: strings.Builder
 	strings.builder_init(&sb)
+	defer strings.builder_destroy(&sb)
 
 	parser := create_parser(&reader, sb)
-
 	read_from_reader(parser)
 
 	error := os.write_entire_file("output.html", string(parser.out.buf[:]))
@@ -84,7 +84,6 @@ handle_pound :: proc(char: u8, parser: ^Parser) {
 		return
 	}
 
-
 	fmt.sbprintf(&parser.out, "<h%d>", number_of_pounds)
 	strings.write_string(&parser.out, string(line[:len(line) - 1]))
 	fmt.sbprintf(&parser.out, "</h%d>", number_of_pounds)
@@ -101,17 +100,4 @@ count_pounds :: proc(parser: ^Parser) -> (int, bool) {
 		return 0, false
 	}
 	return len(slice_until_delim), true
-}
-
-skip_lines :: proc(parser: ^Parser, n_to_skip: int) {
-	i := 0
-	for i < n_to_skip {
-		bufio.reader_read_byte(parser.reader)
-		i += 1
-	}
-}
-
-byte_to_string_allocated :: proc(b: u8) -> string {
-	single_byte_slice := []u8{b}
-	return strings.clone_from_bytes(single_byte_slice)
 }
